@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"path/filepath"
 )
 
 type GithubRepository struct {
@@ -35,14 +36,18 @@ func (r *GithubRepository) DownloadFile(ctx context.Context, url string, dest st
 		return nil
 	}
 
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("failed to create directory: %w", err)
+	}
+
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
-		return nil
+		return err
 	}
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil
+		return err
 	}
 	defer resp.Body.Close()
 
