@@ -10,9 +10,8 @@ import (
 )
 
 type GithubRepository struct {
-	client    *http.Client
-	cacheDir  string
-	manifests map[string]*GithubManifest
+	client   *http.Client
+	cacheDir string
 }
 
 type GithubManifest struct {
@@ -25,9 +24,8 @@ func (r *GithubRepository) Name() string {
 
 func NewGithubRepository(cacheDir string) *GithubRepository {
 	return &GithubRepository{
-		client:    &http.Client{},
-		cacheDir:  cacheDir,
-		manifests: loadGitHubManifests(),
+		client:   &http.Client{},
+		cacheDir: cacheDir,
 	}
 }
 
