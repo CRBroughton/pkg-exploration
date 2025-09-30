@@ -1,0 +1,9 @@
+[packages.jq]
+repo = "jqlang/jq"
+description = "Command-line JSON processor"
+
+[packages.jq.binaries]
+names = ["jq"]
+
+[packages.jq.urls]
+linux-amd64 = "https://github.com/jqlang/jq/releases/download/jq-{version}/jq-linux-amd64"

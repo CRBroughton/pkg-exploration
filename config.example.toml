@@ -1,0 +1,4 @@
+name = "craig-laptop"
+
+[packages]
+jq = "1.7.1"
