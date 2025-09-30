@@ -5,6 +5,7 @@
         "toml-integration",
         "github-repository",
         "dependencies",
-        "manifest"
+        "manifest",
+        "config"
     ]
 }
