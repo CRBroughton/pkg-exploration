@@ -1,6 +1,9 @@
 {
     "conventionalCommits.scopes": [
         "profile",
-        "store"
+        "store",
+        "toml-integration",
+        "github-repository",
+        "dependencies"
     ]
 }
