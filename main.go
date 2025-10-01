@@ -29,6 +29,6 @@ func printUsage() {
 	fmt.Println("  yourpm switch [config-file]")
 	fmt.Println("")
 	fmt.Println("Examples:")
-	fmt.Println("  yourpm switch ~/.yourpm/config.toml")
+	fmt.Println("  yourpm switch config.example.toml")
 	fmt.Println("  yourpm switch  # Uses ~/.yourpm/config.toml by default")
 }

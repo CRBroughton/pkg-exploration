@@ -9,27 +9,23 @@ import (
 	"path/filepath"
 )
 
-type GithubRepository struct {
+type HttpRepository struct {
 	client   *http.Client
 	cacheDir string
 }
 
-type GithubManifest struct {
-	Repo string
+func (r *HttpRepository) Name() string {
+	return "http"
 }
 
-func (r *GithubRepository) Name() string {
-	return "github"
-}
-
-func NewGithubRepository(cacheDir string) *GithubRepository {
-	return &GithubRepository{
+func NewHttpRepository(cacheDir string) *HttpRepository {
+	return &HttpRepository{
 		client:   &http.Client{},
 		cacheDir: cacheDir,
 	}
 }
 
-func (r *GithubRepository) DownloadFile(ctx context.Context, url string, dest string) error {
+func (r *HttpRepository) DownloadFile(ctx context.Context, url string, dest string) error {
 	if _, err := os.Stat(dest); err == nil {
 		return nil
 	}

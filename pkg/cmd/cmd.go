@@ -47,7 +47,7 @@ func Switch(args []string) {
 	fmt.Printf("Packages to install: %d\n\n", len(cfg.Packages))
 
 	ctx := context.Background()
-	repo := repository.NewGithubRepository(filepath.Join(baseDir, "cache"))
+	repo := repository.NewHttpRepository(filepath.Join(baseDir, "cache"))
 	st := store.NewStore(filepath.Join(baseDir, "store"))
 	prof := profile.NewProfile(filepath.Join(baseDir, "profiles", "default"))
 
