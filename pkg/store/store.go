@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -30,6 +31,8 @@ func (s *Store) Install(name string, version string, downloadPath string, binary
 	switch {
 	case strings.HasSuffix(downloadPath, ".tar.gz") || extension == ".tgz":
 		return s.installTarGz(downloadPath, storePath, binaryNames)
+	case strings.HasSuffix(downloadPath, ".tar.xz"):
+		return s.installTarXz(downloadPath, storePath, binaryNames)
 	default:
 		return s.installBinary(name, downloadPath, storePath)
 	}
@@ -133,6 +136,47 @@ func (s *Store) extractTarGz(downloadPath string, destDir string) error {
 		}
 	}
 
+	return nil
+}
+
+func (s *Store) installTarXz(downloadPath string, storePath string, binaryNames []string) (string, error) {
+	tempDir := storePath + ".tmp"
+	if err := os.RemoveAll(tempDir); err != nil {
+		return "", err
+	}
+	if err := os.MkdirAll(tempDir, 0755); err != nil {
+		return "", err
+	}
+	defer os.RemoveAll(tempDir)
+
+	if err := s.extractTarXz(downloadPath, tempDir); err != nil {
+		return "", err
+	}
+
+	if err := os.MkdirAll(storePath, 0755); err != nil {
+		return "", err
+	}
+
+	for _, binaryName := range binaryNames {
+		found, err := s.findAndMoveBinary(tempDir, storePath, binaryName)
+		if err != nil {
+			return "", err
+		}
+		if !found {
+			return "", fmt.Errorf("binary %s not found in archive", binaryName)
+		}
+	}
+
+	return storePath, nil
+}
+
+func (s *Store) extractTarXz(downloadPath string, destDir string) error {
+	// Use tar command to extract .tar.xz
+	// tar automatically detects xz compression
+	cmd := exec.Command("tar", "-xJf", downloadPath, "-C", destDir)
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to extract tar.xz: %w", err)
+	}
 	return nil
 }
 
