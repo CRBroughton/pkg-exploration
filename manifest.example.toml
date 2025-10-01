@@ -77,3 +77,16 @@ linux-amd64 = "https://github.com/pnpm/pnpm/releases/download/v{version}/pnpm-li
 linux-arm64 = "https://github.com/pnpm/pnpm/releases/download/v{version}/pnpm-linux-arm64"
 darwin-amd64 = "https://github.com/pnpm/pnpm/releases/download/v{version}/pnpm-macos-x64"
 darwin-arm64 = "https://github.com/pnpm/pnpm/releases/download/v{version}/pnpm-macos-arm64"
+
+[packages.task]
+repo = "go-task/task"
+description = "A task runner / simpler Make alternative written in Go "
+
+[packages.task.binaries]
+names = ["task"]
+
+[packages.task.urls]
+linux-amd64 = "https://github.com/go-task/task/releases/download/v{version}/task_linux_amd64.tar.gz"
+linux-arm64 = "https://github.com/go-task/task/releases/download/v{version}/task_linux_arm64.tar.gz"
+darwin-amd64 = "https://github.com/go-task/task/releases/download/v{version}/task_darwin_amd64.tar.gz"
+darwin-arm64 = "https://github.com/go-task/task/releases/download/v{version}/task_darwin_arm64.tar.gz"
