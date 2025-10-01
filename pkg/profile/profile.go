@@ -23,11 +23,14 @@ func (p *Profile) Link(storePath string, binaries []string) error {
 	}
 
 	for _, binary := range binaries {
-		source := filepath.Join(storePath, "bin", binary)
+		// Binary is always at: storePath/binary
+		source := filepath.Join(storePath, binary)
 		target := filepath.Join(binDir, binary)
 
+		// Remove existing symlink
 		os.Remove(target)
 
+		// Create symlink
 		if err := os.Symlink(source, target); err != nil {
 			return fmt.Errorf("failed to link %s: %w", binary, err)
 		}
