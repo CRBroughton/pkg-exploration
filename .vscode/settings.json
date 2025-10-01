@@ -8,6 +8,7 @@
         "manifest",
         "config",
         "cli",
-        "http-repository"
+        "http-repository",
+        "docs"
     ]
 }
