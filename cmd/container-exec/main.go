@@ -5,10 +5,10 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strings"
 
 	"github.com/crbroughton/pkg-exploration/pkg/config"
 	"github.com/crbroughton/pkg-exploration/pkg/containers"
+	"github.com/crbroughton/pkg-exploration/pkg/docker"
 )
 
 func main() {
@@ -38,19 +38,28 @@ func main() {
 		os.Exit(1)
 	}
 
+	// Create Docker client
+	dockerClient := docker.NewDefaultDockerClient()
+	
 	// Build image name from config
 	image := fmt.Sprintf("%s:%s", containerConfig.Image, containerConfig.Version)
 	
 	// Ensure container is running
 	containerFullName := fmt.Sprintf("yourpm-%s", containerName)
-	if err := ensureContainerRunning(containerFullName, image, containerDef); err != nil {
+	if err := ensureContainerRunning(dockerClient, containerFullName, image, containerDef); err != nil {
 		fmt.Fprintf(os.Stderr, "Error ensuring container is running: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Execute command directly
-	dockerArgs := buildDockerExecArgs(containerFullName, containerDef, commandName, os.Args[1:])
-	cmd := exec.Command("docker", dockerArgs...)
+	// Execute command using Docker client
+	execOpts := docker.ExecOptions{
+		Interactive: true,
+		TTY:         false, // Avoid TTY issues in automation
+		WorkDir:     containerDef.WorkDir,
+		Command:     append([]string{commandName}, os.Args[1:]...),
+	}
+	
+	cmd := exec.Command("docker", buildDockerExecArgs(containerFullName, containerDef, commandName, os.Args[1:])...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
@@ -94,11 +103,11 @@ func buildDockerExecArgs(containerName string, containerDef *containers.Containe
 	return dockerArgs
 }
 
-func ensureContainerRunning(containerName, image string, containerDef *containers.ContainerDefinition) error {
+func ensureContainerRunning(dockerClient docker.DockerClient, containerName, image string, containerDef *containers.ContainerDefinition) error {
 	// Check if container exists
-	if containerExists(containerName) {
+	if dockerClient.Exists(containerName) {
 		// Check if existing container uses correct image
-		currentImage, err := getContainerImage(containerName)
+		currentImage, err := dockerClient.GetContainerImage(containerName)
 		if err != nil {
 			return fmt.Errorf("failed to get container image: %w", err)
 		}
@@ -106,83 +115,31 @@ func ensureContainerRunning(containerName, image string, containerDef *container
 		// If image changed, remove old container and create new one
 		if currentImage != image {
 			fmt.Printf("  📦 Image changed from %s to %s, recreating container...\n", currentImage, image)
-			if err := removeContainer(containerName); err != nil {
+			if err := dockerClient.Remove(containerName); err != nil {
 				return fmt.Errorf("failed to remove old container: %w", err)
 			}
-			return createContainer(containerName, image, containerDef)
+			return createContainerWithClient(dockerClient, containerName, image, containerDef)
 		}
 		
 		// Container exists with correct image, ensure it's running
-		if !isContainerRunning(containerName) {
-			return startContainer(containerName)
+		if !dockerClient.IsRunning(containerName) {
+			return dockerClient.Start(containerName)
 		}
 		return nil
 	}
 	
 	// Create new container
-	return createContainer(containerName, image, containerDef)
+	return createContainerWithClient(dockerClient, containerName, image, containerDef)
 }
 
-func isContainerRunning(containerName string) bool {
-	cmd := exec.Command("docker", "ps", "--format", "{{.Names}}")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(output), containerName)
-}
-
-func containerExists(containerName string) bool {
-	cmd := exec.Command("docker", "ps", "-a", "--format", "{{.Names}}")
-	output, err := cmd.Output()
-	if err != nil {
-		return false
-	}
-	return strings.Contains(string(output), containerName)
-}
-
-func startContainer(containerName string) error {
-	cmd := exec.Command("docker", "start", containerName)
-	return cmd.Run()
-}
-
-func getContainerImage(containerName string) (string, error) {
-	cmd := exec.Command("docker", "inspect", "--format", "{{.Config.Image}}", containerName)
-	output, err := cmd.Output()
-	if err != nil {
-		return "", err
-	}
-	return strings.TrimSpace(string(output)), nil
-}
-
-func removeContainer(containerName string) error {
-	cmd := exec.Command("docker", "rm", "-f", containerName)
-	return cmd.Run()
-}
-
-func createContainer(containerName, image string, containerDef *containers.ContainerDefinition) error {
-	args := []string{"run", "-d", "--name", containerName, "--entrypoint", ""}
-	
-	// Add volume mounts
-	for _, volume := range containerDef.Volumes {
-		args = append(args, "-v", volume)
+func createContainerWithClient(dockerClient docker.DockerClient, containerName, image string, containerDef *containers.ContainerDefinition) error {
+	opts := docker.CreateOptions{
+		Volumes:    containerDef.Volumes,
+		WorkDir:    containerDef.WorkDir,
+		Entrypoint: "",
+		Command:    []string{"tail", "-f", "/dev/null"}, // Keep container alive
 	}
 	
-	// Add working directory
-	if containerDef.WorkDir != "" {
-		args = append(args, "-w", containerDef.WorkDir)
-	}
-	
-	// Add image and keep-alive command
-	args = append(args, image, "tail", "-f", "/dev/null")
-	
-	cmd := exec.Command("docker", args...)
-	return cmd.Run()
+	return dockerClient.CreateContainer(containerName, image, opts)
 }
 
-func isTerminal() bool {
-	if fileInfo, err := os.Stdin.Stat(); err == nil {
-		return (fileInfo.Mode() & os.ModeCharDevice) != 0
-	}
-	return false
-}
