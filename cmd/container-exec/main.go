@@ -51,15 +51,9 @@ func main() {
 		os.Exit(1)
 	}
 
-	// Execute command using Docker client
-	execOpts := docker.ExecOptions{
-		Interactive: true,
-		TTY:         false, // Avoid TTY issues in automation
-		WorkDir:     containerDef.WorkDir,
-		Command:     append([]string{commandName}, os.Args[1:]...),
-	}
-	
-	cmd := exec.Command("docker", buildDockerExecArgs(containerFullName, containerDef, commandName, os.Args[1:])...)
+	// Execute command directly with proper stdin/stdout/stderr handling
+	dockerArgs := buildDockerExecArgs(containerFullName, containerDef, commandName, os.Args[1:])
+	cmd := exec.Command("docker", dockerArgs...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
