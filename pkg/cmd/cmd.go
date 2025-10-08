@@ -352,6 +352,10 @@ func pruneContainers(cfg *config.Config, aggressive bool) error {
 	
 	if strings.TrimSpace(string(output)) == "" {
 		fmt.Printf("  ✓ No yourpm containers found\n")
+		// Still run cleanup even if no containers to remove
+		if err := cleanupOrphanedSymlinks(); err != nil {
+			fmt.Printf("     ⚠️  Failed to cleanup orphaned symlinks: %v\n", err)
+		}
 		return nil
 	}
 	
@@ -390,6 +394,11 @@ func pruneContainers(cfg *config.Config, aggressive bool) error {
 		fmt.Printf("  ✓ No containers to remove\n")
 	}
 	
+	// Clean up orphaned symlinks
+	if err := cleanupOrphanedSymlinks(); err != nil {
+		fmt.Printf("     ⚠️  Failed to cleanup orphaned symlinks: %v\n", err)
+	}
+	
 	return nil
 }
 
@@ -403,6 +412,10 @@ func pruneAllYourpmContainers() error {
 	
 	if strings.TrimSpace(string(output)) == "" {
 		fmt.Printf("  ✓ No yourpm containers found\n")
+		// Still run cleanup even if no containers to remove
+		if err := cleanupOrphanedSymlinks(); err != nil {
+			fmt.Printf("     ⚠️  Failed to cleanup orphaned symlinks: %v\n", err)
+		}
 		return nil
 	}
 	
@@ -430,6 +443,11 @@ func pruneAllYourpmContainers() error {
 		fmt.Printf("  ✓ No containers to remove\n")
 	}
 	
+	// Clean up orphaned symlinks
+	if err := cleanupOrphanedSymlinks(); err != nil {
+		fmt.Printf("     ⚠️  Failed to cleanup orphaned symlinks: %v\n", err)
+	}
+	
 	return nil
 }
 
@@ -449,5 +467,102 @@ func pruneImages(aggressive bool) error {
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
+}
+
+func cleanupOrphanedSymlinks() error {
+	homeDir, _ := os.UserHomeDir()
+	baseDir := filepath.Join(homeDir, ".yourpm")
+	profileBin := filepath.Join(baseDir, "profiles", "default", "bin")
+	
+	// Check if profile bin directory exists
+	if _, err := os.Stat(profileBin); os.IsNotExist(err) {
+		return nil // Nothing to clean up
+	}
+	
+	// Load current config to know which containers are active
+	configPath := filepath.Join(baseDir, "config.toml")
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		// If no config, still clean up truly broken symlinks
+		cfg = &config.Config{Containers: make(map[string]config.ContainerConfig)}
+	}
+	
+	entries, err := os.ReadDir(profileBin)
+	if err != nil {
+		return fmt.Errorf("failed to read profile bin directory: %w", err)
+	}
+	
+	removedCount := 0
+	for _, entry := range entries {
+		symlinkPath := filepath.Join(profileBin, entry.Name())
+		
+		// Check if it's a symlink
+		info, err := os.Lstat(symlinkPath)
+		if err != nil {
+			continue
+		}
+		
+		if info.Mode()&os.ModeSymlink != 0 {
+			// Get the symlink target
+			target, err := os.Readlink(symlinkPath)
+			if err != nil {
+				continue
+			}
+			
+			shouldRemove := false
+			
+			// Check if the symlink target exists
+			if _, err := os.Stat(symlinkPath); os.IsNotExist(err) {
+				shouldRemove = true
+			} else {
+				// Check if it points to a container store directory that's no longer active
+				storePath := filepath.Join(baseDir, "store")
+				if strings.HasPrefix(target, storePath) {
+					// Extract container name from store path
+					// Format: ~/.yourpm/store/containername-version/command
+					relativePath, err := filepath.Rel(storePath, target)
+					if err == nil {
+						parts := strings.Split(relativePath, string(filepath.Separator))
+						if len(parts) > 0 {
+							// Extract container name from directory name
+							storeDirName := parts[0]
+							
+							// Check if this looks like a container store directory
+							// Container stores contain symlinks to container-exec
+							containerExecPath := filepath.Join(baseDir, "bin", "container-exec")
+							targetFilePath := filepath.Join(storePath, storeDirName, parts[len(parts)-1])
+							if linkTarget, err := os.Readlink(targetFilePath); err == nil && linkTarget == containerExecPath {
+								// This is a container store directory, check if container is still active
+								for containerName := range cfg.Containers {
+									if strings.HasPrefix(storeDirName, containerName+"-") {
+										goto keepSymlink // Container is active, keep symlink
+									}
+								}
+								// No matching active container found, should remove
+								shouldRemove = true
+							}
+						}
+					}
+				}
+			}
+			
+			if shouldRemove {
+				fmt.Printf("  🗑️  Removing orphaned symlink: %s\n", entry.Name())
+				if err := os.Remove(symlinkPath); err != nil {
+					fmt.Printf("     ⚠️  Failed to remove %s: %v\n", entry.Name(), err)
+				} else {
+					removedCount++
+				}
+			}
+		}
+		
+		keepSymlink:
+	}
+	
+	if removedCount > 0 {
+		fmt.Printf("  ✓ Removed %d orphaned symlinks\n", removedCount)
+	}
+	
+	return nil
 }
 
