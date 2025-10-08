@@ -21,3 +21,21 @@ description = "Python programming language"
 commands = ["python", "pip"]
 workdir = "/app"
 volumes = [".:/app"]
+
+[containers.gleam]
+description = "A friendly language for building type-safe, scalable systems"
+commands = ["gleam"]
+workdir = "/app"
+volumes = [".:/app"]
+
+[containers.deno]
+description = "A modern runtime for JavaScript and TypeScript"
+commands = ["deno"]
+workdir = "/app"
+volumes = [".:/app"]
+
+[containers.rust]
+description = "A systems programming language focused on speed, memory safety, and parallelism"
+commands = ["rustc", "cargo"]
+workdir = "/app"
+volumes = [".:/app"]

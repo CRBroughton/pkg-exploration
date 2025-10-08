@@ -21,3 +21,15 @@ version = "1.6.6"
 [containers.python]
 image = "python"
 version = "3.12"
+
+[containers.gleam]
+image = "gleamlang/gleam"
+version = "latest"
+
+[containers.deno]
+image = "denoland/deno"
+version = "latest"
+
+[containers.rust]
+image = "rust"
+version = "latest"
