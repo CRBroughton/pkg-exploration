@@ -360,11 +360,11 @@ func pruneContainers(cfg *config.Config, aggressive bool) error {
 	}
 	
 	containerNames := strings.Split(strings.TrimSpace(string(output)), "\n")
-	activeContainers := make(map[string]bool)
+	configContainers := make(map[string]bool)
 	
-	// Build map of containers that should be kept (from current config)
+	// Build map of containers that are in current config
 	for containerName := range cfg.Containers {
-		activeContainers[fmt.Sprintf("yourpm-%s", containerName)] = true
+		configContainers[fmt.Sprintf("yourpm-%s", containerName)] = true
 	}
 	
 	removedCount := 0
@@ -374,8 +374,18 @@ func pruneContainers(cfg *config.Config, aggressive bool) error {
 			continue
 		}
 		
-		if !aggressive && activeContainers[containerName] {
-			fmt.Printf("  ✓ Keeping active container: %s\n", containerName)
+		shouldKeep := false
+		if !aggressive && configContainers[containerName] {
+			// Check if container is actually running
+			if isContainerRunning(containerName) {
+				shouldKeep = true
+				fmt.Printf("  ✓ Keeping running container: %s\n", containerName)
+			} else {
+				fmt.Printf("  🔄 Container %s is stopped, will be removed\n", containerName)
+			}
+		}
+		
+		if shouldKeep {
 			continue
 		}
 		
@@ -467,6 +477,15 @@ func pruneImages(aggressive bool) error {
 		cmd.Stderr = os.Stderr
 		return cmd.Run()
 	}
+}
+
+func isContainerRunning(containerName string) bool {
+	cmd := exec.Command("docker", "ps", "--filter", fmt.Sprintf("name=%s", containerName), "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return false
+	}
+	return strings.TrimSpace(string(output)) != ""
 }
 
 func cleanupOrphanedSymlinks() error {
