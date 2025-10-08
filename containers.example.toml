@@ -1,0 +1,23 @@
+[containers.elixir]
+description = "Dynamic, functional language designed for building maintainable applications"
+commands = ["elixir", "mix", "iex"]
+workdir = "/app"
+volumes = [".:/app"]
+
+[containers.terraform]
+description = "Infrastructure as Code tool"
+commands = ["terraform"]
+workdir = "/workspace"
+volumes = [".:/workspace"]
+
+[containers.node]
+description = "JavaScript runtime"
+commands = ["node", "npm", "npx"]
+workdir = "/app"
+volumes = [".:/app"]
+
+[containers.python]
+description = "Python programming language"
+commands = ["python", "pip"]
+workdir = "/app"
+volumes = [".:/app"]
