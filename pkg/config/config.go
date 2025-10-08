@@ -8,8 +8,14 @@ import (
 )
 
 type Config struct {
-	Name     string            `toml:"name"`
-	Packages map[string]string `toml:"packages"`
+	Name       string                     `toml:"name"`
+	Packages   map[string]string          `toml:"packages"`
+	Containers map[string]ContainerConfig `toml:"containers"`
+}
+
+type ContainerConfig struct {
+	Image   string `toml:"image"`
+	Version string `toml:"version"`
 }
 
 func LoadConfig(path string) (*Config, error) {

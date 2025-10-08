@@ -9,3 +9,15 @@ glab = "1.47.0"
 node = "18.18.0"
 pnpm = "10.17.1"
 task = "3.45.4"
+
+[containers.elixir]
+image = "elixir"
+version = "1.18.4"
+
+[containers.terraform]
+image = "hashicorp/terraform"
+version = "1.6.6"
+
+[containers.python]
+image = "python"
+version = "3.12"
