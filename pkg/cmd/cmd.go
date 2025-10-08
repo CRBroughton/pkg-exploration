@@ -280,3 +280,174 @@ func imageExistsLocally(image string) bool {
 	return err == nil
 }
 
+func PruneContainers(args []string) {
+	homeDir, _ := os.UserHomeDir()
+	baseDir := filepath.Join(homeDir, ".yourpm")
+	
+	// Load current config to determine which containers to keep
+	configPath := filepath.Join(baseDir, "config.toml")
+	cfg, err := config.LoadConfig(configPath)
+	if err != nil {
+		log.Printf("Warning: Could not load config from %s: %v", configPath, err)
+		log.Printf("Proceeding with prune, but will not protect active containers")
+	}
+	
+	// Check for --all flag
+	aggressive := false
+	for _, arg := range args {
+		if arg == "--all" {
+			aggressive = true
+			break
+		}
+	}
+	
+	fmt.Printf("🐳 Pruning containers...\n\n")
+	
+	if cfg != nil {
+		// Stop and remove containers that are not in current config
+		if err := pruneContainers(cfg, aggressive); err != nil {
+			log.Printf("Error: Failed to prune containers: %v", err)
+		}
+	} else {
+		// No config available, can only do aggressive cleanup
+		if aggressive {
+			if err := pruneAllYourpmContainers(); err != nil {
+				log.Printf("Error: Failed to prune containers: %v", err)
+			}
+		} else {
+			fmt.Printf("  ⚠️  No config found, use --all to remove all yourpm containers\n")
+		}
+	}
+	
+	fmt.Printf("✓ Container cleanup complete\n")
+}
+
+func PruneImages(args []string) {
+	// Check for --all flag
+	aggressive := false
+	for _, arg := range args {
+		if arg == "--all" {
+			aggressive = true
+			break
+		}
+	}
+	
+	fmt.Printf("🖼️  Pruning images...\n\n")
+	
+	// Clean up unused images
+	if err := pruneImages(aggressive); err != nil {
+		log.Printf("Error: Failed to prune images: %v", err)
+	}
+	
+	fmt.Printf("✓ Image cleanup complete\n")
+}
+
+func pruneContainers(cfg *config.Config, aggressive bool) error {
+	// Get all yourpm containers
+	cmd := exec.Command("docker", "ps", "-a", "--filter", "name=yourpm-", "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	
+	if strings.TrimSpace(string(output)) == "" {
+		fmt.Printf("  ✓ No yourpm containers found\n")
+		return nil
+	}
+	
+	containerNames := strings.Split(strings.TrimSpace(string(output)), "\n")
+	activeContainers := make(map[string]bool)
+	
+	// Build map of containers that should be kept (from current config)
+	for containerName := range cfg.Containers {
+		activeContainers[fmt.Sprintf("yourpm-%s", containerName)] = true
+	}
+	
+	removedCount := 0
+	for _, containerName := range containerNames {
+		containerName = strings.TrimSpace(containerName)
+		if containerName == "" {
+			continue
+		}
+		
+		if !aggressive && activeContainers[containerName] {
+			fmt.Printf("  ✓ Keeping active container: %s\n", containerName)
+			continue
+		}
+		
+		fmt.Printf("  🗑️  Removing container: %s\n", containerName)
+		removeCmd := exec.Command("docker", "rm", "-f", containerName)
+		if err := removeCmd.Run(); err != nil {
+			fmt.Printf("     ⚠️  Failed to remove %s: %v\n", containerName, err)
+		} else {
+			removedCount++
+		}
+	}
+	
+	if removedCount > 0 {
+		fmt.Printf("  ✓ Removed %d containers\n", removedCount)
+	} else {
+		fmt.Printf("  ✓ No containers to remove\n")
+	}
+	
+	return nil
+}
+
+func pruneAllYourpmContainers() error {
+	// Get all yourpm containers
+	cmd := exec.Command("docker", "ps", "-a", "--filter", "name=yourpm-", "--format", "{{.Names}}")
+	output, err := cmd.Output()
+	if err != nil {
+		return fmt.Errorf("failed to list containers: %w", err)
+	}
+	
+	if strings.TrimSpace(string(output)) == "" {
+		fmt.Printf("  ✓ No yourpm containers found\n")
+		return nil
+	}
+	
+	containerNames := strings.Split(strings.TrimSpace(string(output)), "\n")
+	removedCount := 0
+	
+	for _, containerName := range containerNames {
+		containerName = strings.TrimSpace(containerName)
+		if containerName == "" {
+			continue
+		}
+		
+		fmt.Printf("  🗑️  Removing container: %s\n", containerName)
+		removeCmd := exec.Command("docker", "rm", "-f", containerName)
+		if err := removeCmd.Run(); err != nil {
+			fmt.Printf("     ⚠️  Failed to remove %s: %v\n", containerName, err)
+		} else {
+			removedCount++
+		}
+	}
+	
+	if removedCount > 0 {
+		fmt.Printf("  ✓ Removed %d containers\n", removedCount)
+	} else {
+		fmt.Printf("  ✓ No containers to remove\n")
+	}
+	
+	return nil
+}
+
+func pruneImages(aggressive bool) error {
+	if aggressive {
+		fmt.Printf("  🗑️  Removing all unused images...\n")
+		// Remove all unused images
+		cmd := exec.Command("docker", "image", "prune", "-a", "-f")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	} else {
+		fmt.Printf("  🗑️  Removing dangling images...\n")
+		// Remove only dangling images
+		cmd := exec.Command("docker", "image", "prune", "-f")
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		return cmd.Run()
+	}
+}
+
